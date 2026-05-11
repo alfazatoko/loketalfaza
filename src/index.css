@@ -34,6 +34,15 @@
   .font-plus {
     font-family: 'Plus Jakarta Sans', sans-serif;
   }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .animate-scaleIn {
+    animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 
 /* Custom select styling */
