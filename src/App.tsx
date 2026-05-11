@@ -42,10 +42,10 @@ interface Transaction {
   id: string | number;
   kategori: string;
   nominal: number;
-  adminFee: number;
+  admin_fee: number;
   keterangan: string;
   waktu: string;
-  tanggalISO: string;
+  tanggal_iso: string;
   kasir: string;
 }
 
@@ -61,7 +61,7 @@ const ViewLayout: React.FC<{
 }> = ({ id, active, title, children, onBack, showBack = false }) => (
   <div 
     id={id} 
-    className={`flex-1 flex flex-col min-h-0 bg-[#f8fafc] ${active ? 'flex' : 'hidden'} animate-fadeIn`}
+    className={`flex-1 flex flex-col min-h-0 ${active ? 'flex' : 'hidden'} animate-fadeIn`}
   >
     {title && (
       <div className="px-5 pt-7 pb-4 border-b border-gray-100 flex items-center gap-3 bg-white">
@@ -126,7 +126,7 @@ const App: React.FC = () => {
       const isNotIsi = !t.kategori.startsWith('Isi ');
       const matchesSearch = t.keterangan.toLowerCase().includes(laporanSearch.toLowerCase()) || 
                             t.kategori.toLowerCase().includes(laporanSearch.toLowerCase());
-      const matchesDate = t.tanggalISO >= laporanStartDate && t.tanggalISO <= laporanEndDate;
+      const matchesDate = t.tanggal_iso >= laporanStartDate && t.tanggal_iso <= laporanEndDate;
       const matchesFilter = laporanFilter === 'Semua' || t.kategori === laporanFilter;
       
       return isNotIsi && matchesSearch && matchesDate && matchesFilter;
@@ -136,7 +136,7 @@ const App: React.FC = () => {
   const filteredSaldoTransactions = useMemo(() => {
     return transactions.filter(t => {
       const isIsi = t.kategori.startsWith('Isi ');
-      const matchesDate = t.tanggalISO >= laporanStartDate && t.tanggalISO <= laporanEndDate;
+      const matchesDate = t.tanggal_iso >= laporanStartDate && t.tanggal_iso <= laporanEndDate;
       const matchesFilter = activeSaldoFilter === 'Semua' || 
                            (activeSaldoFilter === 'Bank' && t.kategori === 'Isi Saldo Bank') ||
                            (activeSaldoFilter === 'Cash' && t.kategori === 'Isi Total Penjualan');
@@ -150,8 +150,8 @@ const App: React.FC = () => {
     fetchTransactions();
     // Subscribe to changes
     const subscription = supabase
-      .channel('public:laporan_transaksi')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'laporan_transaksi' }, () => {
+      .channel('public:transaksi_loket')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi_loket' }, () => {
         fetchTransactions();
       })
       .subscribe();
@@ -163,7 +163,7 @@ const App: React.FC = () => {
 
   const fetchTransactions = async () => {
     const { data, error } = await supabase
-      .from('laporan_transaksi')
+      .from('transaksi_loket')
       .select('*')
       .order('waktu', { ascending: false });
 
@@ -182,7 +182,7 @@ const App: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
   
   const transactionsToday = useMemo(() => {
-    return transactions.filter(t => t.tanggalISO === today && (currentRole === 'OWNER' || t.kasir === currentRole));
+    return transactions.filter(t => t.tanggal_iso === today && (currentRole === 'OWNER' || t.kasir === currentRole));
   }, [transactions, today, currentRole]);
 
   const saldoBank = useMemo(() => {
@@ -202,7 +202,7 @@ const App: React.FC = () => {
     }, 0);
     }, [transactions]);
 
-  const totalAdmin = useMemo(() => transactionsToday.reduce((sum, t) => sum + t.adminFee, 0), [transactionsToday]);
+  const totalAdmin = useMemo(() => transactionsToday.reduce((sum, t) => sum + t.admin_fee, 0), [transactionsToday]);
   const totalVolume = useMemo(() => transactionsToday.reduce((sum, t) => sum + t.nominal, 0), [transactionsToday]);
   const totalTarikTunai = useMemo(() => 
     transactionsToday.filter(t => t.kategori === 'Tarik Tunai').reduce((sum, t) => sum + t.nominal, 0), 
@@ -229,7 +229,7 @@ const App: React.FC = () => {
     setEditingId(t.id);
     setKategori(t.kategori);
     setNominal(formatRupiah(t.nominal.toString()));
-    setAdminFee(formatRupiah(t.adminFee.toString()));
+    setAdminFee(formatRupiah(t.admin_fee.toString()));
     setKeterangan(t.keterangan === '-' ? '' : t.keterangan);
     setCurrentView('view-beranda');
     
@@ -255,11 +255,11 @@ const App: React.FC = () => {
       if (editingId) {
         // --- MODE UPDATE ---
         const { error } = await supabase
-          .from('laporan_transaksi')
+          .from('transaksi_loket')
           .update({
             kategori,
             nominal: rawNominal,
-            adminFee: rawAdmin,
+            admin_fee: rawAdmin,
             keterangan: keterangan || '-',
           })
           .eq('id', editingId);
@@ -271,16 +271,16 @@ const App: React.FC = () => {
         const now = new Date();
         const newTransaction = {
           tanggal: now.toLocaleDateString('id-ID'),
-          tanggalISO: today,
+          tanggal_iso: today,
           kategori,
           nominal: rawNominal,
-          adminFee: rawAdmin,
+          admin_fee: rawAdmin,
           keterangan: keterangan || '-',
           waktu: now.toISOString(),
           kasir: currentRole
         };
 
-        const { error } = await supabase.from('laporan_transaksi').insert([newTransaction]);
+        const { error } = await supabase.from('transaksi_loket').insert([newTransaction]);
         if (error) throw error;
         alert('Transaksi Berhasil Disimpan!');
       }
@@ -302,16 +302,16 @@ const App: React.FC = () => {
 
     const newTransaction = {
       tanggal: now.toLocaleDateString('id-ID'),
-      tanggalISO: today,
+      tanggal_iso: today,
       kategori: `Isi ${jenisSaldo}`,
       nominal: rawNominal,
-      adminFee: 0,
+      admin_fee: 0,
       keterangan: keteranganIsi || 'Setoran saldo',
       waktu: now.toISOString(),
       kasir: currentRole
     };
 
-    const { error } = await supabase.from('laporan_transaksi').insert([newTransaction]);
+    const { error } = await supabase.from('transaksi_loket').insert([newTransaction]);
 
     if (error) {
       alert('Gagal menyimpan saldo: ' + error.message);
@@ -403,7 +403,7 @@ const App: React.FC = () => {
   const themeClasses = {
     light: 'bg-[#f8fafc] text-gray-800',
     dark: 'bg-gray-900 text-gray-100',
-    blue: 'bg-blue-900 text-white'
+    blue: 'bg-sky-500 text-white'
   };
 
   const containerClasses = {
@@ -513,9 +513,9 @@ const App: React.FC = () => {
                   <div className={`w-full aspect-square rounded-lg bg-gray-900 border transition-all ${theme === 'dark' ? 'border-blue-600 shadow-sm' : 'border-gray-800'}`} />
                   <span className="text-[7px] font-black uppercase opacity-30">Gelap</span>
                 </button>
-                <button onClick={() => setTheme('blue')} className="flex flex-col items-center gap-1">
-                  <div className={`w-full aspect-square rounded-lg bg-blue-700 border transition-all ${theme === 'blue' ? 'border-amber-400 shadow-sm' : 'border-blue-800'}`} />
-                  <span className="text-[7px] font-black uppercase opacity-30">Biru</span>
+                 <button onClick={() => setTheme('blue')} className="flex flex-col items-center gap-1">
+                  <div className={`w-full aspect-square rounded-lg bg-sky-400 border transition-all ${theme === 'blue' ? 'border-white shadow-sm' : 'border-sky-600'}`} />
+                  <span className="text-[7px] font-black uppercase opacity-30">Sky</span>
                 </button>
               </div>
             </div>
@@ -532,7 +532,7 @@ const App: React.FC = () => {
         {/* --- VIEWS --- */}
 
         {/* GLOBAL HEADER */}
-        <div className={`px-5 pt-6 pb-6 flex justify-between items-center z-50 rounded-b-[2.5rem] shadow-sm ${theme === 'dark' ? 'bg-gray-900 border-b border-gray-800' : (theme === 'blue' ? 'bg-blue-900 border-b border-blue-800' : 'bg-white border-b border-gray-100')}`}>
+        <div className={`px-5 pt-6 pb-6 flex justify-between items-center z-50 rounded-b-[2.5rem] shadow-xl ${theme === 'dark' ? 'bg-gray-900' : (theme === 'blue' ? 'bg-sky-600' : 'bg-white')}`}>
           <button 
             onClick={() => setIsSidePanelOpen(true)}
             className={`w-9 h-9 rounded-xl shadow-sm flex items-center justify-center border transition-all ${theme === 'dark' || theme === 'blue' ? 'bg-white/10 border-white/10 text-white' : 'bg-white border-gray-100 text-gray-400'}`}
@@ -828,7 +828,7 @@ const App: React.FC = () => {
                                 Rp {t.nominal.toLocaleString('id-ID')}
                               </td>
                               <td className="p-1.5 text-[8px] font-black text-gray-800 text-center tabular-nums">
-                                Rp {t.adminFee.toLocaleString('id-ID')}
+                                Rp {t.admin_fee.toLocaleString('id-ID')}
                               </td>
                               <td className="p-1.5 text-[8px] font-bold text-gray-400 truncate max-w-[80px]">
                                 {t.keterangan}
@@ -844,7 +844,7 @@ const App: React.FC = () => {
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
                                         <div className="flex items-center gap-1.5">
-                                          <Calendar className="w-3 h-3" /> {t.tanggalISO}
+                                          <Calendar className="w-3 h-3" /> {t.tanggal_iso}
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                           <UserCircle className="w-3 h-3" /> {t.kasir}
@@ -1306,7 +1306,7 @@ const App: React.FC = () => {
         <nav 
           onClick={(e) => handleElementSelect('NAVIGASI_BAWAH', e)} 
           style={inspectorStyle('NAVIGASI_BAWAH')}
-          className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] h-[75px] z-[100] rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex items-center justify-around px-2 border-t ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : (theme === 'blue' ? 'bg-blue-900 border-blue-800' : 'bg-white border-gray-100')}`}
+          className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] h-[75px] z-[100] rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(0,0,0,0.03)] flex items-center justify-around px-2 border-t ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : (theme === 'blue' ? 'bg-sky-600 border-sky-500' : 'bg-white border-gray-100')}`}
         >
           {[
             { id: 'view-beranda', label: 'Beranda', icon: Home },
